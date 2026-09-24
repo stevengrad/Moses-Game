@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Quiz Arena</title>
+<link href="https://fonts.googleapis.com/css2?family=Bungee&family=Rajdhani:wght@500;700&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#0a0a1f;--ink:#f2f4ff;--dim:#8b90b8;--panel:#15153a;--c0:#00e5ff;--c1:#ff3d9a;--c2:#b8ff2c;--c3:#ffb020}
+*{box-sizing:border-box;margin:0}
+html,body{min-height:100%}
+body{background:var(--bg);color:var(--ink);font-family:'Rajdhani',system-ui,sans-serif;font-weight:500;font-size:18px;overflow-x:hidden}
+h1,h2,.pts,button,.cat{font-family:'Bungee','Impact',sans-serif;font-weight:400}
+/* moving background */
+body::before,body::after{content:"";position:fixed;width:60vmax;height:60vmax;border-radius:50%;filter:blur(90px);opacity:.28;z-index:-1;animation:drift 18s ease-in-out infinite alternate}
+body::before{background:var(--c1);top:-25vmax;left:-15vmax}
+body::after{background:var(--c0);bottom:-25vmax;right:-15vmax;animation-delay:-9s}
+@keyframes drift{to{transform:translate(12vmax,8vmax) scale(1.15)}}
+.wrap{max-width:1100px;margin:0 auto;padding:20px 16px 40px}
+.view{animation:enter .45s cubic-bezier(.2,.9,.3,1.2) both}
+@keyframes enter{from{opacity:0;transform:translateY(24px) scale(.97)}}
+button{cursor:pointer;border:0;color:#0a0a1f;background:var(--c0);padding:12px 20px;border-radius:12px;font-size:1rem;letter-spacing:.5px;transition:transform .15s,box-shadow .15s;box-shadow:0 5px 0 #0087a0}
+button:hover{transform:translateY(-3px);box-shadow:0 8px 0 #0087a0}
+button:active{transform:translateY(4px);box-shadow:0 1px 0 #0087a0}
+button.pink{background:var(--c1);box-shadow:0 5px 0 #a3125f}button.pink:hover{box-shadow:0 8px 0 #a3125f}button.pink:active{box-shadow:0 1px 0 #a3125f}
+button.ghost{background:#22224f;color:var(--ink);box-shadow:0 5px 0 #0d0d28}button.ghost:hover{box-shadow:0 8px 0 #0d0d28}button.ghost:active{box-shadow:0 1px 0 #0d0d28}
+:focus-visible{outline:3px solid var(--c2);outline-offset:3px}
+/* home */
+.home{min-height:88vh;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;gap:34px}
+.home h1{font-size:clamp(2.8rem,10vw,6.5rem);line-height:.95;background:linear-gradient(90deg,var(--c0),var(--c1),var(--c3),var(--c0));background-size:300% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;animation:shine 6s linear infinite;filter:drop-shadow(0 0 24px #ff3d9a55)}
+@keyframes shine{to{background-position:300% 0}}
+.home p{color:var(--dim);font-size:1.25rem}
+.choices{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:22px;width:100%;max-width:720px}
+.choice{padding:32px 20px;border-radius:22px;font-size:1.5rem;display:flex;flex-direction:column;gap:10px;align-items:center;text-align:center;border:3px solid currentColor;background:var(--panel);color:var(--c0);box-shadow:0 0 0 0 currentColor;animation:pulse 2.6s infinite}
+.choice small{font-family:'Rajdhani';font-weight:500;font-size:1.05rem;color:var(--dim)}
+.choice .ic{font-size:3rem;transition:transform .3s}
+.choice:hover .ic{transform:scale(1.3) rotate(-10deg)}
+.choice.b{color:var(--c1);animation-delay:-1.3s}
+.choice:hover{transform:translateY(-6px) rotate(-1deg);box-shadow:0 0 34px -4px currentColor}
+@keyframes pulse{50%{box-shadow:0 0 22px -6px currentColor}}
+/* board */
+.bar{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:22px}
+.bar h2{font-size:clamp(1.3rem,4vw,2rem)}
+.board{display:grid;grid-template-columns:repeat(4,1fr);gap:clamp(8px,1.6vw,18px)}
+.col{display:contents}
+.cat{padding:16px 8px;border-radius:14px;text-align:center;color:#0a0a1f;font-size:clamp(.7rem,2.2vw,1.25rem);word-break:break-word;display:flex;align-items:center;justify-content:center;min-height:70px;animation:drop .6s cubic-bezier(.2,1.4,.4,1) both}
+@keyframes drop{from{opacity:0;transform:translateY(-40px) rotate(-4deg)}}
+.tile{--c:var(--c0);height:clamp(80px,17vw,140px);border-radius:16px;background:var(--panel);color:var(--c);border:3px solid var(--c);font-size:clamp(1.3rem,4.5vw,2.6rem);display:flex;align-items:center;justify-content:center;box-shadow:0 5px 0 color-mix(in srgb,var(--c) 45%,#000);animation:pop .5s cubic-bezier(.2,1.5,.4,1) both;animation-delay:var(--d)}
+@keyframes pop{from{opacity:0;transform:scale(.4) rotate(-8deg)}}
+.tile:hover{transform:translateY(-5px) scale(1.05) rotate(-1.5deg);background:var(--c);color:#0a0a1f;box-shadow:0 0 30px -2px var(--c)}
+.tile.used{opacity:.25;pointer-events:none;filter:grayscale(1);transform:scale(.94);transition:all .4s}
+/* modal */
+.ov{position:fixed;inset:0;background:#05051acc;backdrop-filter:blur(6px);display:flex;align-items:center;justify-content:center;padding:16px;z-index:10;animation:fade .25s both}
+@keyframes fade{from{opacity:0}}
+.card{--c:var(--c0);width:min(760px,100%);max-height:92vh;overflow:auto;background:var(--panel);border:4px solid var(--c);border-radius:26px;padding:clamp(20px,4vw,40px);text-align:center;display:flex;flex-direction:column;gap:22px;box-shadow:0 0 60px -8px var(--c);animation:zoom .45s cubic-bezier(.2,1.5,.4,1) both}
+@keyframes zoom{from{opacity:0;transform:scale(.3) rotate(6deg)}}
+.tag{color:var(--c);font-family:'Bungee';font-size:1rem}
+.q{font-size:clamp(1.5rem,4.5vw,2.6rem);font-weight:700;line-height:1.25}
+.ans{border-radius:16px;background:var(--c);color:#0a0a1f;padding:18px;font-size:clamp(1.4rem,4vw,2.2rem);font-weight:700;animation:flip .6s cubic-bezier(.2,1.3,.4,1) both}
+@keyframes flip{from{opacity:0;transform:perspective(600px) rotateX(-90deg)}}
+.parts{position:fixed;inset:0;pointer-events:none;z-index:20;overflow:hidden}
+.parts i{position:absolute;left:50%;top:55%;width:12px;height:12px;border-radius:3px;animation:burst 1.1s ease-out forwards}
+@keyframes burst{to{transform:translate(var(--x),var(--y)) rotate(var(--r));opacity:0}}
+/* timer */
+.timer{position:relative;height:40px;border-radius:12px;background:#0a0a26;border:2px solid #34346b;overflow:hidden}
+.fill{position:absolute;inset:0 auto 0 0;width:100%;background:var(--c);opacity:.85}
+.timer span{position:relative;display:block;text-align:center;line-height:36px;font-family:'Bungee';color:#fff;text-shadow:0 0 4px #000,0 0 8px #000}
+.timer.low .fill{background:#ff3d3d;animation:blink .5s infinite alternate}
+.timer.up{animation:shake .5s}
+.timer.up .fill{background:#ff3d3d;opacity:1}
+@keyframes blink{to{opacity:.35}}
+@keyframes shake{20%,60%{transform:translateX(-9px)}40%,80%{transform:translateX(9px)}}
+.tbox{background:var(--panel);border:3px solid var(--c3);border-radius:20px;padding:18px;margin-bottom:20px;display:flex;flex-wrap:wrap;align-items:center;gap:12px}
+.tbox label{color:var(--c3);font-size:1.1rem}.tbox input{max-width:120px;font-family:'Bungee'}.tbox small{color:var(--dim)}
+/* editor */
+.eg{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:20px}
+.ec{--c:var(--c0);background:var(--panel);border:3px solid var(--c);border-radius:20px;padding:18px;display:flex;flex-direction:column;gap:12px;animation:pop .5s cubic-bezier(.2,1.5,.4,1) both}
+label{font-size:.95rem;color:var(--c);font-weight:700}
+input,textarea{width:100%;background:#0a0a26;color:var(--ink);border:2px solid #34346b;border-radius:10px;padding:10px;font:inherit;font-size:1.05rem;resize:vertical;transition:border-color .2s,box-shadow .2s}
+input:focus,textarea:focus{outline:0;border-color:var(--c);box-shadow:0 0 14px -2px var(--c)}
+.ec input.name{font-family:'Bungee';font-size:1.1rem}
+.pair{display:flex;flex-direction:column;gap:6px;padding-top:10px;border-top:2px dashed #34346b}
+.actions{display:flex;gap:12px;flex-wrap:wrap;margin-top:24px}
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--c2);color:#0a0a1f;padding:12px 22px;border-radius:14px;font-family:'Bungee';z-index:30;animation:up .4s cubic-bezier(.2,1.5,.4,1) both}
+@keyframes up{from{opacity:0;transform:translate(-50%,40px)}}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}
+</style>
+</head>
+<body>
+<div class="wrap" id="app"></div>
+<script>
+const COLORS=['var(--c0)','var(--c1)','var(--c2)','var(--c3)'];
+const POINTS=[100,200,300];
+const DEFAULT=[
+ {name:'Gaming',items:[{q:'Which game has a Battle Bus?',a:'Fortnite'},{q:'What is the best-selling video game of all time?',a:'Minecraft'},{q:'Which company makes the PlayStation?',a:'Sony'}]},
+ {name:'Football',items:[{q:'How many players are on the field per team?',a:'11'},{q:'Which country won the 2022 World Cup?',a:'Argentina'},{q:'Which club plays at Old Trafford?',a:'Manchester United'}]},
+ {name:'Science',items:[{q:'What planet is known as the Red Planet?',a:'Mars'},{q:'What gas do plants absorb from the air?',a:'Carbon dioxide'},{q:'What is the hardest natural material?',a:'Diamond'}]},
+ {name:'Random',items:[{q:'How many continents are there?',a:'7'},{q:'What is the largest ocean?',a:'The Pacific Ocean'},{q:'How many minutes are in one day?',a:'1,440'}]}
+];
+const $=(t,p={},...k)=>{const e=document.createElement(t);Object.assign(e,p);k.flat().forEach(x=>e.append(x));return e};
+const app=document.getElementById('app');
+let data=DEFAULT,secs=20,used=new Set();
+
+function validate(d){return Array.isArray(d)&&d.length===4&&d.every(c=>c&&typeof c.name==='string'&&Array.isArray(c.items)&&c.items.length===3)}
+function unpack(d){
+  const cats=Array.isArray(d)?d:d&&d.categories;
+  if(!validate(cats))return false;
+  data=JSON.parse(JSON.stringify(cats));
+  const t=Array.isArray(d)?20:Number(d.timer);
+  secs=t>=0&&t<=600?Math.round(t):20;
+  return true;
+}
+async function init(){
+  let ok=false;
+  try{ok=unpack(JSON.parse(localStorage.getItem('quizArenaData')))}catch(e){}
+  if(!ok){try{const r=await fetch('data.json',{cache:'no-store'});if(r.ok)ok=unpack(await r.json())}catch(e){}}
+  if(!ok)unpack(DEFAULT);
+  route();
+}
+function toast(m){const t=$('div',{className:'toast',textContent:m});document.body.append(t);setTimeout(()=>t.remove(),2200)}
+function show(v){app.replaceChildren(v);v.classList.add('view');window.scrollTo(0,0)}
+function route(){const h=location.hash;h==='#play'?play():h==='#edit'?edit():home()}
+window.addEventListener('hashchange',route);
+
+function home(){
+  show($('div',{className:'home'},
+    $('h1',{textContent:'Quiz Arena'}),
+    $('p',{textContent:'Pick a box. Read the question. Think fast.'}),
+    $('div',{className:'choices'},
+      $('button',{className:'choice',onclick:()=>{used.clear();location.hash='#play'}},$('span',{className:'ic',textContent:'🎮'}),'Play the game',$('small',{textContent:'4 categories, 12 questions'})),
+      $('button',{className:'choice b',onclick:()=>location.hash='#edit'},$('span',{className:'ic',textContent:'✏️'}),'Edit questions',$('small',{textContent:'Write your own categories'}))
+    )));
+}
+
+function play(){
+  const board=$('div',{className:'board'});
+  data.forEach((c,i)=>board.append($('div',{className:'cat',textContent:c.name,dir:'auto',style:`background:${COLORS[i]};animation-delay:${i*.1}s`})));
+  POINTS.forEach((p,r)=>data.forEach((c,i)=>{
+    const id=i+'-'+r;
+    const t=$('button',{className:'tile'+(used.has(id)?' used':''),textContent:p,style:`--c:${COLORS[i]};--d:${.4+(r*4+i)*.05}s`,onclick:()=>openQ(i,r,t,id)});
+    board.append(t);
+  }));
+  show($('div',{},
+    $('div',{className:'bar'},$('button',{className:'ghost',textContent:'← Menu',onclick:()=>location.hash=''}),$('h2',{textContent:'Choose a box'}),$('button',{className:'pink',textContent:'Reset',onclick:()=>{used.clear();play()}})),
+    board));
+}
+
+function openQ(i,r,tile,id){
+  const {q,a}=data[i].items[r];
+  let left=secs,iv;
+  const fill=$('div',{className:'fill'}),num=$('span',{textContent:'⏱ '+left});
+  const tm=$('div',{className:'timer'},fill,num);
+  const stop=()=>{
+    if(!iv)return;clearInterval(iv);iv=0;
+    fill.style.width=getComputedStyle(fill).width;fill.style.transition='none';
+  };
+  const ans=$('div',{className:'ans',dir:'auto',textContent:a});
+  const foot=$('div');
+  const showBtn=$('button',{className:'pink',textContent:'Show answer',onclick:()=>{
+    stop();foot.replaceChildren($('button',{textContent:'Done ✓',onclick:close}));card.insertBefore(ans,foot);boom();
+  }});
+  foot.append(showBtn);
+  const card=$('div',{className:'card',style:`--c:${COLORS[i]}`},
+    $('div',{className:'tag',textContent:data[i].name+' • '+POINTS[r]}),
+    secs>0?tm:[],
+    $('div',{className:'q',dir:'auto',textContent:q||'(No question written yet)'}),foot);
+  const ov=$('div',{className:'ov',onclick:e=>{if(e.target===ov)close()}},card);
+  function close(){clearInterval(iv);used.add(id);tile.classList.add('used');ov.remove();document.removeEventListener('keydown',esc)}
+  function esc(e){if(e.key==='Escape')close()}
+  document.addEventListener('keydown',esc);
+  document.body.append(ov);showBtn.focus();
+  if(secs>0){
+    requestAnimationFrame(()=>requestAnimationFrame(()=>{fill.style.transition=`width ${secs}s linear`;fill.style.width='0%'}));
+    iv=setInterval(()=>{
+      left--;num.textContent='⏱ '+left;
+      if(left<=5)tm.classList.add('low');
+      if(left<=0){stop();tm.classList.remove('low');tm.classList.add('up');num.textContent="⏱ Time's up!"}
+    },1000);
+  }
+}
+
+function boom(){
+  const w=$('div',{className:'parts'});
+  for(let n=0;n<40;n++){
+    const a=Math.random()*Math.PI*2,d=120+Math.random()*260;
+    w.append($('i',{style:`background:${COLORS[n%4]};--x:${Math.cos(a)*d}px;--y:${Math.sin(a)*d}px;--r:${Math.random()*720}deg`}));
+  }
+  document.body.append(w);setTimeout(()=>w.remove(),1200);
+}
+
+function edit(){
+  const draft=JSON.parse(JSON.stringify(data));let dsecs=secs;
+  const grid=$('div',{className:'eg'});
+  draft.forEach((c,i)=>{
+    const card=$('div',{className:'ec',style:`--c:${COLORS[i]};animation-delay:${i*.1}s`},
+      $('label',{textContent:'Category '+(i+1)}),
+      $('input',{className:'name',value:c.name,dir:'auto',maxLength:30,oninput:e=>c.name=e.target.value}));
+    c.items.forEach((it,r)=>card.append($('div',{className:'pair'},
+      $('label',{textContent:POINTS[r]+' points: question'}),
+      $('textarea',{rows:2,value:it.q,dir:'auto',oninput:e=>it.q=e.target.value}),
+      $('label',{textContent:'Answer'}),
+      $('input',{value:it.a,dir:'auto',oninput:e=>it.a=e.target.value}))));
+    grid.append(card);
+  });
+  const tin=$('input',{type:'number',min:0,max:600,value:dsecs,oninput:e=>{dsecs=Math.min(600,Math.max(0,Math.round(Number(e.target.value))||0))}});
+  const tbox=$('div',{className:'tbox'},$('label',{textContent:'⏱ Timer per question (seconds)'}),tin,$('small',{textContent:'Use 0 to turn the timer off'}));
+  const save=()=>{data=JSON.parse(JSON.stringify(draft));secs=dsecs;try{localStorage.setItem('quizArenaData',JSON.stringify({timer:secs,categories:data}));toast('Saved!')}catch(e){toast('Could not save here')}};
+  const exp=()=>{const j=JSON.stringify({timer:dsecs,categories:draft},null,2);(navigator.clipboard?navigator.clipboard.writeText(j):Promise.reject()).then(()=>toast('Copied! Save it as data.json'),()=>prompt('Copy this and save it as data.json',j))};
+  const imp=()=>{const s=prompt('Paste your exported data here');if(!s)return;try{if(!unpack(JSON.parse(s)))throw 0;edit();toast('Imported!')}catch(e){toast('That data is not valid')}};
+  const reset=()=>{if(confirm('Bring back the sample questions?')){unpack(DEFAULT);try{localStorage.removeItem('quizArenaData')}catch(e){}edit();toast('Sample questions restored')}};
+  show($('div',{},
+    $('div',{className:'bar'},$('button',{className:'ghost',textContent:'← Menu',onclick:()=>location.hash=''}),$('h2',{textContent:'Edit questions'}),$('button',{textContent:'Play ▶',onclick:()=>{save();used.clear();location.hash='#play'}})),
+    tbox,grid,
+    $('div',{className:'actions'},
+      $('button',{className:'pink',textContent:'Save',onclick:save}),
+      $('button',{className:'ghost',textContent:'Copy data',onclick:exp}),
+      $('button',{className:'ghost',textContent:'Import data',onclick:imp}),
+      $('button',{className:'ghost',textContent:'Reset samples',onclick:reset}))));
+}
+init();
+</script>
+</body>
+</html>
