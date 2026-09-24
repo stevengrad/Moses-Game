@@ -349,6 +349,16 @@
           transform: scale(0.3) rotate(6deg);
         }
       }
+      /* tag, timer and buttons keep their size; only the question text shrinks and scrolls */
+      .card > * {
+        flex-shrink: 0;
+      }
+      .card > .q {
+        flex-shrink: 1;
+        min-height: 4.5em;
+        overflow-y: auto;
+        overscroll-behavior: contain;
+      }
       .tag {
         color: var(--c);
         font-family: "Bungee", "Lalezar";
@@ -409,6 +419,8 @@
         cursor: pointer;
         user-select: none;
         -webkit-tap-highlight-color: transparent;
+        flex-shrink: 0; /* never let a long question squash the timer */
+        min-height: 40px;
       }
       .fill {
         position: absolute;
@@ -886,7 +898,7 @@
         }
         document.addEventListener("keydown", esc);
         document.body.append(ov);
-        showBtn.focus();
+        showBtn.focus({ preventScroll: true });
         if (secs > 0) {
           requestAnimationFrame(() => requestAnimationFrame(run));
         }
