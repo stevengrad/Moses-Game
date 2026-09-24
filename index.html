@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Quiz Arena</title>
+<title>Moses Game</title>
 <link href="https://fonts.googleapis.com/css2?family=Bungee&family=Rajdhani:wght@500;700&display=swap" rel="stylesheet">
 <style>
 :root{--bg:#0a0a1f;--ink:#f2f4ff;--dim:#8b90b8;--panel:#15153a;--c0:#00e5ff;--c1:#ff3d9a;--c2:#b8ff2c;--c3:#ffb020}
@@ -124,7 +124,7 @@ window.addEventListener('hashchange',route);
 
 function home(){
   show($('div',{className:'home'},
-    $('h1',{textContent:'Quiz Arena'}),
+    $('h1',{textContent:'Moses Game'}),
     $('p',{textContent:'Pick a box. Read the question. Think fast.'}),
     $('div',{className:'choices'},
       $('button',{className:'choice',onclick:()=>{used.clear();location.hash='#play'}},$('span',{className:'ic',textContent:'🎮'}),'Play the game',$('small',{textContent:'4 categories, 12 questions'})),
