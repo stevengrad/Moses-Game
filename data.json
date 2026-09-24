@@ -1,0 +1,73 @@
+{
+  "timer": 20,
+  "categories": [
+    {
+      "name": "طقس",
+      "items": [
+        {
+          "q": "Which game has a Battle Bus?",
+          "a": "Fortnite"
+        },
+        {
+          "q": "What is the best-selling video game of all time?",
+          "a": "Minecraft"
+        },
+        {
+          "q": "Which company makes the PlayStation?",
+          "a": "Sony"
+        }
+      ]
+    },
+    {
+      "name": "Football",
+      "items": [
+        {
+          "q": "How many players are on the field per team?",
+          "a": "11"
+        },
+        {
+          "q": "Which country won the 2022 World Cup?",
+          "a": "Argentina"
+        },
+        {
+          "q": "Which club plays at Old Trafford?",
+          "a": "Manchester United"
+        }
+      ]
+    },
+    {
+      "name": "Science",
+      "items": [
+        {
+          "q": "What planet is known as the Red Planet?",
+          "a": "Mars"
+        },
+        {
+          "q": "What gas do plants absorb from the air?",
+          "a": "Carbon dioxide"
+        },
+        {
+          "q": "What is the hardest natural material?",
+          "a": "Diamond"
+        }
+      ]
+    },
+    {
+      "name": "Random",
+      "items": [
+        {
+          "q": "How many continents are there?",
+          "a": "7"
+        },
+        {
+          "q": "What is the largest ocean?",
+          "a": "The Pacific Ocean"
+        },
+        {
+          "q": "How many minutes are in one day?",
+          "a": "1,440"
+        }
+      ]
+    }
+  ]
+}
