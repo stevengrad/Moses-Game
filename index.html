@@ -249,9 +249,33 @@
         align-items: center;
         gap: 10px;
         margin-bottom: 22px;
+        position: relative;
+        min-height: 44px;
       }
       .bar h2 {
         font-size: clamp(1.3rem, 4vw, 2rem);
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        transform: translate(-50%, -50%);
+        margin: 0;
+        width: max-content;
+        max-width: 58%;
+        text-align: center;
+        pointer-events: none;
+      }
+      @media (max-width: 640px) {
+        .bar {
+          flex-direction: column;
+          align-items: center;
+        }
+        .bar h2 {
+          position: static;
+          transform: none;
+          width: 100%;
+          max-width: 100%;
+          order: -1;
+        }
       }
       .board {
         display: grid;
@@ -414,6 +438,26 @@
         background: #0a0a26;
         border: 2px solid #34346b;
         overflow: hidden;
+      }
+      .timer.clickable {
+        cursor: pointer;
+        user-select: none;
+      }
+      .timer.clickable:active {
+        transform: scale(0.98);
+      }
+      .timer.paused {
+        border-color: var(--c3);
+      }
+      .timer.paused .fill {
+        opacity: 0.4;
+      }
+      .timer-hint {
+        display: block;
+        text-align: center;
+        color: var(--dim);
+        font-size: 0.85rem;
+        margin-top: -6px;
       }
       .fill {
         position: absolute;
@@ -578,6 +622,13 @@
     <script>
       const COLORS = ["var(--c0)", "var(--c1)", "var(--c2)", "var(--c3)"];
       const POINTS = [100, 200, 300];
+      // Moses Race difficulty levels, easiest to hardest. Each question in
+      // data.json can carry a "d" field with one of these values; anything
+      // missing/unrecognized falls back to "medium".
+      const LEVELS = ["veasy", "easy", "medium", "hard"];
+      function levelOf(item) {
+        return LEVELS.includes(item.d) ? item.d : "medium";
+      }
 
       // ---- fallback data (used only if data.json can't be loaded) ----
       const RISK_DEFAULT = [
@@ -649,7 +700,10 @@
           name: "History",
           items: [
             { q: "Who was the first man on the moon?", a: "Neil Armstrong" },
-            { q: "Which ancient civilization built the pyramids of Giza?", a: "The Ancient Egyptians" },
+            {
+              q: "Which ancient civilization built the pyramids of Giza?",
+              a: "The Ancient Egyptians",
+            },
             { q: "In which century are we now?", a: "The 21st century" },
           ],
         },
@@ -665,8 +719,14 @@
           name: "Traditions",
           items: [
             { q: "How many days does Holy Week last?", a: "8 days" },
-            { q: "What is the sacred oil used after baptism called?", a: "Chrism (Muron)" },
-            { q: "How many times is the newly baptized immersed in water?", a: "3 times" },
+            {
+              q: "What is the sacred oil used after baptism called?",
+              a: "Chrism (Muron)",
+            },
+            {
+              q: "How many times is the newly baptized immersed in water?",
+              a: "3 times",
+            },
           ],
         },
       ];
@@ -721,7 +781,8 @@
               Array.isArray(c.items) &&
               c.items.length >= 1 &&
               c.items.every(
-                (it) => it && typeof it.q === "string" && typeof it.a === "string",
+                (it) =>
+                  it && typeof it.q === "string" && typeof it.a === "string",
               ),
           )
         );
@@ -1024,42 +1085,83 @@
               $("h2", { textContent: "Moses Race — choose a category" }),
             ),
             $("p", {
-              style:
-                "color:var(--dim);margin-bottom:20px;text-align:center",
+              style: "color:var(--dim);margin-bottom:20px;text-align:center",
               textContent:
                 "Pick a category, then hit Start. You'll have " +
                 raceRoundSecs +
                 " seconds to get through as many questions as you can!",
             }),
             grid,
-            $("div", {
-              className: "actions",
-              style: "justify-content:center",
-            }, startBtn),
+            $(
+              "div",
+              {
+                className: "actions",
+                style: "justify-content:center",
+              },
+              startBtn,
+            ),
           ),
         );
       }
 
       function startRace(catIndex) {
         const cat = raceData[catIndex];
-        let queue = shuffled(cat.items.length),
-          qPos = 0,
-          score = 0,
+
+        // ---- difficulty-aware draw order ----
+        // Group question indices by level, then every "round" pulls exactly
+        // one question from each level that actually has questions, shuffles
+        // the order those go in, and hands them out one by one. Once a round
+        // is used up, a fresh round is drawn the same way — this repeats for
+        // as long as the clock is running. Each level keeps its own shuffled
+        // queue that reshuffles and starts over once it runs out, so nothing
+        // ever gets stuck even on a long run.
+        const pools = {};
+        LEVELS.forEach((l) => (pools[l] = []));
+        cat.items.forEach((it, i) => pools[levelOf(it)].push(i));
+        const activeLevels = LEVELS.filter((l) => pools[l].length > 0);
+        const drawFromLevel = {};
+        activeLevels.forEach((l) => {
+          const poolArr = pools[l];
+          let order = shuffled(poolArr.length),
+            pos = 0;
+          drawFromLevel[l] = () => {
+            if (pos >= order.length) {
+              order = shuffled(poolArr.length);
+              pos = 0;
+            }
+            return poolArr[order[pos++]];
+          };
+        });
+        let roundQueue = [];
+        function nextIdx() {
+          if (roundQueue.length === 0) {
+            const drawn = activeLevels.map((l) => drawFromLevel[l]());
+            const order = shuffled(drawn.length);
+            roundQueue = order.map((i) => drawn[i]);
+          }
+          return roundQueue.shift();
+        }
+
+        let score = 0,
           left = raceRoundSecs,
           ended = false,
-          iv;
-
-        function nextIdx() {
-          if (qPos >= queue.length) {
-            queue = shuffled(cat.items.length);
-            qPos = 0;
-          }
-          return queue[qPos++];
-        }
+          paused = false,
+          iv = null;
 
         const fill = $("div", { className: "fill" }),
           num = $("span", { textContent: "⏱ " + left });
-        const tm = $("div", { className: "timer" }, fill, num);
+        const tm = $("div", {
+          className: "timer clickable",
+          title: "Tap to pause / resume",
+          onclick: () => {
+            if (ended) return;
+            paused ? resumeTimer() : pauseTimer();
+          },
+        }, fill, num);
+        const timerHint = $("small", {
+          className: "timer-hint",
+          textContent: "Tap the timer to pause",
+        });
         const scoreTag = $("div", {
           className: "tag",
           textContent: "Answered: 0",
@@ -1068,9 +1170,13 @@
         const foot = $("div");
         const card = $(
           "div",
-          { className: "card", style: `--c:${COLORS[catIndex % COLORS.length]}` },
+          {
+            className: "card",
+            style: `--c:${COLORS[catIndex % COLORS.length]}`,
+          },
           $("div", { className: "tag", dir: "auto", textContent: cat.name }),
           tm,
+          timerHint,
           scoreTag,
           qBox,
           foot,
@@ -1120,6 +1226,48 @@
           raceResults(catIndex, score);
         }
 
+        function startTick() {
+          iv = setInterval(() => {
+            left--;
+            num.textContent = "⏱ " + left;
+            if (left <= 5) tm.classList.add("low");
+            if (left <= 0) {
+              tm.classList.remove("low");
+              tm.classList.add("up");
+              num.textContent = "⏱ Time's up!";
+              finish();
+            }
+          }, 1000);
+        }
+
+        function pauseTimer() {
+          if (paused || ended) return;
+          paused = true;
+          clearInterval(iv);
+          iv = null;
+          // freeze the bar exactly where its CSS transition currently is
+          fill.style.width = getComputedStyle(fill).width;
+          fill.style.transition = "none";
+          tm.classList.add("paused");
+          num.textContent = "⏸ " + left;
+          timerHint.textContent = "Paused — tap the timer to resume";
+        }
+
+        function resumeTimer() {
+          if (!paused || ended) return;
+          paused = false;
+          tm.classList.remove("paused");
+          num.textContent = "⏱ " + left;
+          timerHint.textContent = "Tap the timer to pause";
+          startTick();
+          requestAnimationFrame(() =>
+            requestAnimationFrame(() => {
+              fill.style.transition = `width ${left}s linear`;
+              fill.style.width = "0%";
+            }),
+          );
+        }
+
         show(
           $(
             "div",
@@ -1141,18 +1289,7 @@
           ),
         );
         renderQuestion();
-
-        iv = setInterval(() => {
-          left--;
-          num.textContent = "⏱ " + left;
-          if (left <= 5) tm.classList.add("low");
-          if (left <= 0) {
-            tm.classList.remove("low");
-            tm.classList.add("up");
-            num.textContent = "⏱ Time's up!";
-            finish();
-          }
-        }, 1000);
+        startTick();
         requestAnimationFrame(() =>
           requestAnimationFrame(() => {
             fill.style.transition = `width ${raceRoundSecs}s linear`;
