@@ -1167,7 +1167,10 @@
           textContent: "Answered: 0",
         });
         const qBox = $("div", { className: "q", dir: "auto" });
-        const foot = $("div");
+        const foot = $("div", {
+          className: "actions",
+          style: "justify-content:center",
+        });
         const card = $(
           "div",
           {
@@ -1214,6 +1217,14 @@
                     },
                   }),
                 );
+              },
+            }),
+            $("button", {
+              className: "ghost",
+              textContent: "Skip ⏭",
+              onclick: () => {
+                if (ended) return;
+                renderQuestion();
               },
             }),
           );
