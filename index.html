@@ -224,6 +224,12 @@
         color: var(--c1);
         animation-delay: -1.3s;
       }
+      .choice.sel {
+        box-shadow:
+          0 0 0 4px currentColor,
+          0 0 40px -4px currentColor;
+        transform: translateY(-6px);
+      }
       .choice:hover {
         transform: translateY(-6px) rotate(-1deg);
         box-shadow: 0 0 34px -4px currentColor;
@@ -349,16 +355,6 @@
           transform: scale(0.3) rotate(6deg);
         }
       }
-      /* tag, timer and buttons keep their size; only the question text shrinks and scrolls */
-      .card > * {
-        flex-shrink: 0;
-      }
-      .card > .q {
-        flex-shrink: 1;
-        min-height: 4.5em;
-        overflow-y: auto;
-        overscroll-behavior: contain;
-      }
       .tag {
         color: var(--c);
         font-family: "Bungee", "Lalezar";
@@ -415,13 +411,6 @@
         border: 2px solid #34346b;
         overflow: hidden;
       }
-      .timer {
-        cursor: pointer;
-        user-select: none;
-        -webkit-tap-highlight-color: transparent;
-        flex-shrink: 0; /* never let a long question squash the timer */
-        min-height: 40px;
-      }
       .fill {
         position: absolute;
         inset: 0 auto 0 0;
@@ -444,12 +433,7 @@
         background: #ff3d3d;
         animation: blink 0.5s infinite alternate;
       }
-      .timer.paused .fill {
-        animation: none;
-        opacity: 0.4;
-      }
       .timer.up {
-        cursor: default;
         animation: shake 0.5s;
       }
       .timer.up .fill {
@@ -590,7 +574,9 @@
     <script>
       const COLORS = ["var(--c0)", "var(--c1)", "var(--c2)", "var(--c3)"];
       const POINTS = [100, 200, 300];
-      const DEFAULT = [
+
+      // ---- fallback data (used only if data.json can't be loaded) ----
+      const RISK_DEFAULT = [
         {
           name: "Gaming",
           items: [
@@ -630,6 +616,49 @@
           ],
         },
       ];
+      const RACE_DEFAULT = [
+        {
+          name: "General",
+          items: [
+            { q: "What is the capital of France?", a: "Paris" },
+            { q: "How many days are in a week?", a: "7" },
+            { q: "What color do you get mixing blue and yellow?", a: "Green" },
+          ],
+        },
+        {
+          name: "Sports",
+          items: [
+            { q: "How many players in a football team?", a: "11" },
+            { q: "How many rings on the Olympic flag?", a: "5" },
+            { q: "What sport uses a shuttlecock?", a: "Badminton" },
+          ],
+        },
+        {
+          name: "Science",
+          items: [
+            { q: "What planet do we live on?", a: "Earth" },
+            { q: "What gas do humans breathe in to live?", a: "Oxygen" },
+            { q: "How many legs does a spider have?", a: "8" },
+          ],
+        },
+        {
+          name: "History",
+          items: [
+            { q: "Who was the first man on the moon?", a: "Neil Armstrong" },
+            { q: "Which ancient civilization built the pyramids of Giza?", a: "The Ancient Egyptians" },
+            { q: "In which century are we now?", a: "The 21st century" },
+          ],
+        },
+        {
+          name: "Riddles",
+          items: [
+            { q: "What has hands but can't clap?", a: "A clock" },
+            { q: "What gets wetter as it dries?", a: "A towel" },
+            { q: "What has a neck but no head?", a: "A bottle" },
+          ],
+        },
+      ];
+
       const $ = (t, p = {}, ...k) => {
         const e = document.createElement(t);
         Object.assign(e, p);
@@ -637,11 +666,17 @@
         return e;
       };
       const app = document.getElementById("app");
-      let data = DEFAULT,
-        secs = 20,
+
+      // ---- Moses Risk state ----
+      let riskData = RISK_DEFAULT,
+        riskSecs = 20,
         used = new Set();
 
-      function validate(d) {
+      // ---- Moses Race state ----
+      let raceData = RACE_DEFAULT,
+        raceRoundSecs = 30;
+
+      function validateRisk(d) {
         return (
           Array.isArray(d) &&
           d.length === 4 &&
@@ -654,28 +689,52 @@
           )
         );
       }
-      function unpack(d) {
+      function unpackRisk(d) {
         const cats = Array.isArray(d) ? d : d && d.categories;
-        if (!validate(cats)) return false;
-        data = JSON.parse(JSON.stringify(cats));
+        if (!validateRisk(cats)) return false;
+        riskData = JSON.parse(JSON.stringify(cats));
         const t = Array.isArray(d) ? 20 : Number(d.timer);
-        secs = t >= 0 && t <= 600 ? Math.round(t) : 20;
+        riskSecs = t >= 0 && t <= 600 ? Math.round(t) : 20;
         return true;
       }
+
+      function validateRace(d) {
+        return (
+          Array.isArray(d) &&
+          d.length === 5 &&
+          d.every(
+            (c) =>
+              c &&
+              typeof c.name === "string" &&
+              Array.isArray(c.items) &&
+              c.items.length >= 1 &&
+              c.items.every(
+                (it) => it && typeof it.q === "string" && typeof it.a === "string",
+              ),
+          )
+        );
+      }
+      function unpackRace(d) {
+        const cats = Array.isArray(d) ? d : d && d.categories;
+        if (!validateRace(cats)) return false;
+        raceData = JSON.parse(JSON.stringify(cats));
+        const t = Array.isArray(d) ? 30 : Number(d.timer);
+        raceRoundSecs = t > 0 && t <= 600 ? Math.round(t) : 30;
+        return true;
+      }
+
       async function init() {
-        let ok = false;
         try {
-          ok = unpack(JSON.parse(localStorage.getItem("quizArenaData")));
+          const r = await fetch("data.json", { cache: "no-store" });
+          if (r.ok) {
+            const j = await r.json();
+            if (j && j.risk) unpackRisk(j.risk);
+            if (j && j.race) unpackRace(j.race);
+          }
         } catch (e) {}
-        if (!ok) {
-          try {
-            const r = await fetch("data.json", { cache: "no-store" });
-            if (r.ok) ok = unpack(await r.json());
-          } catch (e) {}
-        }
-        if (!ok) unpack(DEFAULT);
         route();
       }
+
       function toast(m) {
         const t = $("div", { className: "toast", textContent: m });
         document.body.append(t);
@@ -686,9 +745,17 @@
         v.classList.add("view");
         window.scrollTo(0, 0);
       }
+      function shuffled(n) {
+        const arr = Array.from({ length: n }, (_, i) => i);
+        for (let i = arr.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [arr[i], arr[j]] = [arr[j], arr[i]];
+        }
+        return arr;
+      }
       function route() {
         const h = location.hash;
-        h === "#play" ? play() : h === "#edit" ? edit() : home();
+        h === "#risk" ? riskBoard() : h === "#race" ? raceHome() : home();
       }
       window.addEventListener("hashchange", route);
 
@@ -699,7 +766,7 @@
             { className: "home" },
             $("h1", { textContent: "Moses Game" }),
             $("p", {
-              textContent: "Pick a box. Read the question. Think fast.",
+              textContent: "Pick a game to get started.",
             }),
             $(
               "div",
@@ -710,31 +777,38 @@
                   className: "choice",
                   onclick: () => {
                     used.clear();
-                    location.hash = "#play";
+                    location.hash = "#risk";
                   },
                 },
                 $("span", { className: "ic", textContent: "🎮" }),
-                "Play the game",
+                "Moses Risk",
                 $("small", { textContent: "4 categories, 12 questions" }),
               ),
               $(
                 "button",
                 {
                   className: "choice b",
-                  onclick: () => (location.hash = "#edit"),
+                  onclick: () => {
+                    location.hash = "#race";
+                  },
                 },
-                $("span", { className: "ic", textContent: "✏️" }),
-                "Edit questions",
-                $("small", { textContent: "Write your own categories" }),
+                $("span", { className: "ic", textContent: "🏁" }),
+                "Moses Race",
+                $("small", {
+                  textContent: raceRoundSecs + "-second speed round",
+                }),
               ),
             ),
           ),
         );
       }
 
-      function play() {
+      // =======================================================
+      // MOSES RISK (the box-picking, points-based game)
+      // =======================================================
+      function riskBoard() {
         const board = $("div", { className: "board" });
-        data.forEach((c, i) =>
+        riskData.forEach((c, i) =>
           board.append(
             $("div", {
               className: "cat",
@@ -745,7 +819,7 @@
           ),
         );
         POINTS.forEach((p, r) =>
-          data.forEach((c, i) => {
+          riskData.forEach((c, i) => {
             const id = i + "-" + r;
             const t = $("button", {
               className: "tile" + (used.has(id) ? " used" : ""),
@@ -768,13 +842,13 @@
                 textContent: "← Menu",
                 onclick: () => (location.hash = ""),
               }),
-              $("h2", { textContent: "Choose a box" }),
+              $("h2", { textContent: "Moses Risk — choose a box" }),
               $("button", {
                 className: "pink",
                 textContent: "Reset",
                 onclick: () => {
                   used.clear();
-                  play();
+                  riskBoard();
                 },
               }),
             ),
@@ -784,66 +858,18 @@
       }
 
       function openQ(i, r, tile, id) {
-        const { q, a } = data[i].items[r];
-        let remaining = secs * 1000, // ms left on the clock
-          end = 0, // timestamp when the clock will hit zero
-          iv = 0,
-          paused = false,
-          over = false; // answer shown / time's up / closed: timer is finished
+        const { q, a } = riskData[i].items[r];
+        let left = riskSecs,
+          iv;
         const fill = $("div", { className: "fill" }),
-          num = $("span", { textContent: "⏱ " + secs });
-        const tm = $("div", {
-          className: "timer",
-          title: "Click to pause / resume",
-        }, fill, num);
-        // freeze the bar exactly where it is
-        const freeze = () => {
+          num = $("span", { textContent: "⏱ " + left });
+        const tm = $("div", { className: "timer" }, fill, num);
+        const stop = () => {
+          if (!iv) return;
           clearInterval(iv);
           iv = 0;
           fill.style.width = getComputedStyle(fill).width;
           fill.style.transition = "none";
-        };
-        // final stop (can't be resumed)
-        const stop = () => {
-          over = true;
-          if (iv) freeze();
-        };
-        const tick = () => {
-          remaining = Math.max(0, end - Date.now());
-          const left = Math.ceil(remaining / 1000);
-          num.textContent = "⏱ " + left;
-          if (left <= 5) tm.classList.add("low");
-          if (remaining <= 0) {
-            stop();
-            tm.classList.remove("low");
-            tm.classList.add("up");
-            num.textContent = "⏱ Time's up!";
-          }
-        };
-        // start / resume the countdown from whatever time is left
-        const run = () => {
-          if (over || paused) return;
-          end = Date.now() + remaining;
-          void fill.offsetWidth; // make sure the frozen width is applied first
-          fill.style.transition = `width ${remaining / 1000}s linear`;
-          fill.style.width = "0%";
-          iv = setInterval(tick, 200);
-        };
-        // click the timer: pause <-> resume
-        tm.onclick = () => {
-          if (over || (!iv && !paused)) return;
-          if (paused) {
-            paused = false;
-            tm.classList.remove("paused");
-            num.textContent = "⏱ " + Math.ceil(remaining / 1000);
-            run();
-          } else {
-            remaining = Math.max(0, end - Date.now());
-            paused = true;
-            freeze();
-            tm.classList.add("paused");
-            num.textContent = "⏸ " + Math.ceil(remaining / 1000);
-          }
         };
         const ans = $("div", { className: "ans", dir: "auto", textContent: a });
         const foot = $("div");
@@ -865,9 +891,9 @@
           { className: "card", style: `--c:${COLORS[i]}` },
           $("div", {
             className: "tag",
-            textContent: data[i].name + " • " + POINTS[r],
+            textContent: riskData[i].name + " • " + POINTS[r],
           }),
-          secs > 0 ? tm : [],
+          riskSecs > 0 ? tm : [],
           $("div", {
             className: "q",
             dir: "auto",
@@ -886,7 +912,6 @@
           card,
         );
         function close() {
-          over = true;
           clearInterval(iv);
           used.add(id);
           tile.classList.add("used");
@@ -898,9 +923,25 @@
         }
         document.addEventListener("keydown", esc);
         document.body.append(ov);
-        showBtn.focus({ preventScroll: true });
-        if (secs > 0) {
-          requestAnimationFrame(() => requestAnimationFrame(run));
+        showBtn.focus();
+        if (riskSecs > 0) {
+          requestAnimationFrame(() =>
+            requestAnimationFrame(() => {
+              fill.style.transition = `width ${riskSecs}s linear`;
+              fill.style.width = "0%";
+            }),
+          );
+          iv = setInterval(() => {
+            left--;
+            num.textContent = "⏱ " + left;
+            if (left <= 5) tm.classList.add("low");
+            if (left <= 0) {
+              stop();
+              tm.classList.remove("low");
+              tm.classList.add("up");
+              num.textContent = "⏱ Time's up!";
+            }
+          }, 1000);
         }
       }
 
@@ -919,116 +960,39 @@
         setTimeout(() => w.remove(), 1200);
       }
 
-      function edit() {
-        const draft = JSON.parse(JSON.stringify(data));
-        let dsecs = secs;
-        const grid = $("div", { className: "eg" });
-        draft.forEach((c, i) => {
-          const card = $(
-            "div",
-            {
-              className: "ec",
-              style: `--c:${COLORS[i]};animation-delay:${i * 0.1}s`,
-            },
-            $("label", { textContent: "Category " + (i + 1) }),
-            $("input", {
-              className: "name",
-              value: c.name,
-              dir: "auto",
-              maxLength: 30,
-              oninput: (e) => (c.name = e.target.value),
-            }),
-          );
-          c.items.forEach((it, r) =>
-            card.append(
-              $(
-                "div",
-                { className: "pair" },
-                $("label", { textContent: POINTS[r] + " points: question" }),
-                $("textarea", {
-                  rows: 2,
-                  value: it.q,
-                  dir: "auto",
-                  oninput: (e) => (it.q = e.target.value),
-                }),
-                $("label", { textContent: "Answer" }),
-                $("input", {
-                  value: it.a,
-                  dir: "auto",
-                  oninput: (e) => (it.a = e.target.value),
-                }),
-              ),
-            ),
-          );
-          grid.append(card);
-        });
-        const tin = $("input", {
-          type: "number",
-          min: 0,
-          max: 600,
-          value: dsecs,
-          oninput: (e) => {
-            dsecs = Math.min(
-              600,
-              Math.max(0, Math.round(Number(e.target.value)) || 0),
-            );
+      // =======================================================
+      // MOSES RACE (pick a category, beat the 30s clock)
+      // =======================================================
+      function raceHome() {
+        let selected = null;
+        const grid = $("div", { className: "choices" });
+        const startBtn = $("button", {
+          className: "pink",
+          textContent: "Start ▶",
+          disabled: true,
+          onclick: () => {
+            if (selected !== null) startRace(selected);
           },
         });
-        const tbox = $(
-          "div",
-          { className: "tbox" },
-          $("label", { textContent: "⏱ Timer per question (seconds)" }),
-          tin,
-          $("small", { textContent: "Use 0 to turn the timer off" }),
-        );
-        const save = () => {
-          data = JSON.parse(JSON.stringify(draft));
-          secs = dsecs;
-          try {
-            localStorage.setItem(
-              "quizArenaData",
-              JSON.stringify({ timer: secs, categories: data }),
-            );
-            toast("Saved!");
-          } catch (e) {
-            toast("Could not save here");
-          }
-        };
-        const exp = () => {
-          const j = JSON.stringify(
-            { timer: dsecs, categories: draft },
-            null,
-            2,
+        raceData.forEach((c, i) => {
+          const btn = $(
+            "button",
+            {
+              className: "choice",
+              style: `color:${COLORS[i % COLORS.length]}`,
+              onclick: () => {
+                selected = i;
+                [...grid.children].forEach((ch) => ch.classList.remove("sel"));
+                btn.classList.add("sel");
+                startBtn.disabled = false;
+              },
+            },
+            $("span", { className: "ic", textContent: "📚" }),
+            $("span", { dir: "auto", textContent: c.name }),
+            $("small", { textContent: c.items.length + " questions" }),
           );
-          (navigator.clipboard
-            ? navigator.clipboard.writeText(j)
-            : Promise.reject()
-          ).then(
-            () => toast("Copied! Save it as data.json"),
-            () => prompt("Copy this and save it as data.json", j),
-          );
-        };
-        const imp = () => {
-          const s = prompt("Paste your exported data here");
-          if (!s) return;
-          try {
-            if (!unpack(JSON.parse(s))) throw 0;
-            edit();
-            toast("Imported!");
-          } catch (e) {
-            toast("That data is not valid");
-          }
-        };
-        const reset = () => {
-          if (confirm("Bring back the sample questions?")) {
-            unpack(DEFAULT);
-            try {
-              localStorage.removeItem("quizArenaData");
-            } catch (e) {}
-            edit();
-            toast("Sample questions restored");
-          }
-        };
+          grid.append(btn);
+        });
         show(
           $(
             "div",
@@ -1041,45 +1005,178 @@
                 textContent: "← Menu",
                 onclick: () => (location.hash = ""),
               }),
-              $("h2", { textContent: "Edit questions" }),
-              $("button", {
-                textContent: "Play ▶",
-                onclick: () => {
-                  save();
-                  used.clear();
-                  location.hash = "#play";
-                },
-              }),
+              $("h2", { textContent: "Moses Race — choose a category" }),
             ),
-            tbox,
+            $("p", {
+              style: "color:var(--dim);margin-bottom:20px",
+              textContent:
+                "Pick a category, then hit Start. You'll have " +
+                raceRoundSecs +
+                " seconds to get through as many questions as you can!",
+            }),
             grid,
+            $("div", { className: "actions" }, startBtn),
+          ),
+        );
+      }
+
+      function startRace(catIndex) {
+        const cat = raceData[catIndex];
+        let queue = shuffled(cat.items.length),
+          qPos = 0,
+          score = 0,
+          left = raceRoundSecs,
+          ended = false,
+          iv;
+
+        function nextIdx() {
+          if (qPos >= queue.length) {
+            queue = shuffled(cat.items.length);
+            qPos = 0;
+          }
+          return queue[qPos++];
+        }
+
+        const fill = $("div", { className: "fill" }),
+          num = $("span", { textContent: "⏱ " + left });
+        const tm = $("div", { className: "timer" }, fill, num);
+        const scoreTag = $("div", {
+          className: "tag",
+          textContent: "Answered: 0",
+        });
+        const qBox = $("div", { className: "q", dir: "auto" });
+        const foot = $("div");
+        const card = $(
+          "div",
+          { className: "card", style: `--c:${COLORS[catIndex % COLORS.length]}` },
+          $("div", { className: "tag", dir: "auto", textContent: cat.name }),
+          tm,
+          scoreTag,
+          qBox,
+          foot,
+        );
+
+        function renderQuestion() {
+          const item = cat.items[nextIdx()];
+          qBox.textContent = item.q;
+          foot.replaceChildren(
+            $("button", {
+              className: "pink",
+              textContent: "Show answer",
+              onclick: () => {
+                if (ended) return;
+                const ans = $("div", {
+                  className: "ans",
+                  dir: "auto",
+                  textContent: item.a,
+                });
+                card.insertBefore(ans, foot);
+                foot.replaceChildren(
+                  $("button", {
+                    textContent: "Next ▶",
+                    onclick: () => {
+                      if (ended) return;
+                      score++;
+                      scoreTag.textContent = "Answered: " + score;
+                      renderQuestion();
+                    },
+                  }),
+                );
+              },
+            }),
+          );
+        }
+
+        function finish() {
+          if (ended) return;
+          ended = true;
+          clearInterval(iv);
+          raceResults(catIndex, score);
+        }
+
+        show(
+          $(
+            "div",
+            {},
             $(
               "div",
-              { className: "actions" },
+              { className: "bar" },
+              $("button", {
+                className: "ghost",
+                textContent: "← Menu",
+                onclick: () => {
+                  clearInterval(iv);
+                  location.hash = "";
+                },
+              }),
+              $("h2", { textContent: "Moses Race" }),
+            ),
+            card,
+          ),
+        );
+        renderQuestion();
+
+        iv = setInterval(() => {
+          left--;
+          num.textContent = "⏱ " + left;
+          if (left <= 5) tm.classList.add("low");
+          if (left <= 0) {
+            tm.classList.remove("low");
+            tm.classList.add("up");
+            num.textContent = "⏱ Time's up!";
+            finish();
+          }
+        }, 1000);
+        requestAnimationFrame(() =>
+          requestAnimationFrame(() => {
+            fill.style.transition = `width ${raceRoundSecs}s linear`;
+            fill.style.width = "0%";
+          }),
+        );
+      }
+
+      function raceResults(catIndex, score) {
+        const cat = raceData[catIndex];
+        show(
+          $(
+            "div",
+            { className: "home" },
+            $("h1", {
+              style: "font-size:clamp(2rem,8vw,4rem)",
+              textContent: "⏱ Time's up!",
+            }),
+            $("p", { dir: "auto", textContent: cat.name }),
+            $("div", {
+              className: "ans",
+              style: `--c:${COLORS[catIndex % COLORS.length]};max-width:340px;margin:0 auto`,
+              textContent:
+                "You answered " +
+                score +
+                (score === 1 ? " question!" : " questions!"),
+            }),
+            $(
+              "div",
+              { className: "actions", style: "justify-content:center" },
               $("button", {
                 className: "pink",
-                textContent: "Save",
-                onclick: save,
+                textContent: "Play again",
+                onclick: () => startRace(catIndex),
               }),
               $("button", {
                 className: "ghost",
-                textContent: "Copy data",
-                onclick: exp,
+                textContent: "Change category",
+                onclick: () => raceHome(),
               }),
               $("button", {
                 className: "ghost",
-                textContent: "Import data",
-                onclick: imp,
-              }),
-              $("button", {
-                className: "ghost",
-                textContent: "Reset samples",
-                onclick: reset,
+                textContent: "Menu",
+                onclick: () => (location.hash = ""),
               }),
             ),
           ),
         );
       }
+
       init();
     </script>
   </body>
