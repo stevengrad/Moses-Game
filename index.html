@@ -190,7 +190,9 @@
         grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
         gap: 22px;
         width: 100%;
-        max-width: 720px;
+        max-width: 940px;
+        margin: 0 auto;
+        justify-content: center;
       }
       .choice {
         padding: 32px 20px;
@@ -404,7 +406,9 @@
       }
       /* timer */
       .timer {
-        position: relative;
+        position: sticky;
+        top: 0;
+        z-index: 5;
         height: 40px;
         border-radius: 12px;
         background: #0a0a26;
@@ -657,6 +661,14 @@
             { q: "What has a neck but no head?", a: "A bottle" },
           ],
         },
+        {
+          name: "Traditions",
+          items: [
+            { q: "How many days does Holy Week last?", a: "8 days" },
+            { q: "What is the sacred oil used after baptism called?", a: "Chrism (Muron)" },
+            { q: "How many times is the newly baptized immersed in water?", a: "3 times" },
+          ],
+        },
       ];
 
       const $ = (t, p = {}, ...k) => {
@@ -701,7 +713,7 @@
       function validateRace(d) {
         return (
           Array.isArray(d) &&
-          d.length === 5 &&
+          d.length === 6 &&
           d.every(
             (c) =>
               c &&
@@ -974,7 +986,11 @@
             if (selected !== null) startRace(selected);
           },
         });
-        raceData.forEach((c, i) => {
+        // Shuffle the order the category cards are shown in every time this
+        // screen is opened, while each category keeps its own fixed color
+        // and its real index (so scores/labels stay correct).
+        shuffled(raceData.length).forEach((i) => {
+          const c = raceData[i];
           const btn = $(
             "button",
             {
@@ -996,7 +1012,7 @@
         show(
           $(
             "div",
-            {},
+            { style: "max-width:980px;margin:0 auto" },
             $(
               "div",
               { className: "bar" },
@@ -1008,14 +1024,18 @@
               $("h2", { textContent: "Moses Race — choose a category" }),
             ),
             $("p", {
-              style: "color:var(--dim);margin-bottom:20px",
+              style:
+                "color:var(--dim);margin-bottom:20px;text-align:center",
               textContent:
                 "Pick a category, then hit Start. You'll have " +
                 raceRoundSecs +
                 " seconds to get through as many questions as you can!",
             }),
             grid,
-            $("div", { className: "actions" }, startBtn),
+            $("div", {
+              className: "actions",
+              style: "justify-content:center",
+            }, startBtn),
           ),
         );
       }
@@ -1056,7 +1076,12 @@
           foot,
         );
 
+        function clearAnswer() {
+          card.querySelectorAll(".ans").forEach((el) => el.remove());
+        }
+
         function renderQuestion() {
+          clearAnswer();
           const item = cat.items[nextIdx()];
           qBox.textContent = item.q;
           foot.replaceChildren(
@@ -1065,6 +1090,7 @@
               textContent: "Show answer",
               onclick: () => {
                 if (ended) return;
+                clearAnswer();
                 const ans = $("div", {
                   className: "ans",
                   dir: "auto",
