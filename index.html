@@ -361,6 +361,7 @@
       .card {
         --c: var(--c0);
         width: min(760px, 100%);
+        margin: 0 auto;
         max-height: 92vh;
         max-height: 92dvh;
         overflow: auto;
@@ -1282,7 +1283,7 @@
         show(
           $(
             "div",
-            {},
+            { style: "max-width:820px;margin:0 auto" },
             $(
               "div",
               { className: "bar" },
